@@ -2,7 +2,13 @@
 
 ### NppAnotherMarkdown 0.1.5 (released 2026-01-??)
 
-Hello from Mars :) :satellite:
+@startuml
+Bob -> Alice : hello
+@enduml
+
+19^th^ H~2~O C~2~H~5~OH - спирт!
+
+Hello from Mars :) :satellite: :alien:
 
 Euler’s identity $e^{i\pi}+1=0$ is a beautiful formula in $\mathbb{R}^2$.
 
