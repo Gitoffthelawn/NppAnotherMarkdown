@@ -38,7 +38,6 @@ window.viewPlugin = (() => {
       "align",
       "attrs",
       "container",
-      "demo",
       "dl",
       "figure",
       "footnote",
