@@ -2,9 +2,36 @@
 
 ### NppAnotherMarkdown 0.1.5 (released 2026-01-??)
 
-@startuml
-Bob -> Alice : hello
-@enduml
+* Markdown Plugin Pack added
+
+| plugin        | example     |
+|---------------|-------------|
+| [abbr](https://mdit-plugins.github.io/abbr.html)               | Support abbreviation tag \<abbr\>                                              
+| [alert](https://mdit-plugins.github.io/alert.html)             | GFM style alerts                                            
+| [align](https://mdit-plugins.github.io/align.html)             | Plugin to align contents                                              
+| [container](https://mdit-plugins.github.io/container.html)     | Creating block-level custom containers                                        
+| [dl](https://mdit-plugins.github.io/dl.html)                   | Definition list                                              
+| [emoji](https://github.com/markdown-it/markdown-it-emoji)      | Emoji                                                
+| [figure](https://mdit-plugins.github.io/figure.html)           | Generating figures with captions from images                                              
+| [footnote](https://mdit-plugins.github.io/footnote.html)       | Footnotes 
+| [imgLazyLoad](https://mdit-plugins.github.io/img-lazyload.html)| Lazy loading for images                                              
+| [imgMark](https://mdit-plugins.github.io/img-mark.html)        | Mark images by ID suffix for theme mode                                              
+| [imgSize](https://mdit-plugins.github.io/img-size.html)        | Support setting size for images                                              
+| [ins](https://mdit-plugins.github.io/ins.html)                 | Аdd \<insert\> tag support                                              
+| [katex](https://mdit-plugins.github.io/katex.html)             | Math Expressions<br> ![](help/plugin-katex.jpg)
+| [mark](https://mdit-plugins.github.io/mark.html)               | Mark and highlight contents                                              
+| [plantuml](https://mdit-plugins.github.io/plantuml.html)       | Support plant uml schemes                                            
+| [ruby](https://mdit-plugins.github.io/ruby.html)               | Ruby annotation \<ruby\>                                              
+| [spoiler](https://mdit-plugins.github.io/spoiler.html)         | Plugin to hide content                                              
+| [stylize](https://mdit-plugins.github.io/stylize.html)         | Plugin for stylizing tokens                                              
+| [sub](https://mdit-plugins.github.io/sub.html)                 | Plugin to support subscript                                              
+| [sup](https://mdit-plugins.github.io/sup.html)                 | Plugin to support superscript                                              
+| [tab](https://mdit-plugins.github.io/tab.html)                 | Block-level custom tabs                                              
+
+> [!note]
+> Note Text
+
+:100: :) :( :alien: :satellite:
 
 19^th^ H~2~O C~2~H~5~OH - спирт!
 
@@ -12,7 +39,7 @@ Hello from Mars :) :satellite: :alien:
 
 Euler’s identity $e^{i\pi}+1=0$ is a beautiful formula in $\mathbb{R}^2$.
 
-$$ S = S_0 + V \cdot t + \frac {a \cdot t^2} {2}$$
+$$ S(t) = S_0 + V \cdot t + \frac {a \cdot t^2} {2}$$
 
 $$
 \frac {\partial^r} {\partial \omega^r} \left(\frac {y^{\omega}} {\omega}\right)
