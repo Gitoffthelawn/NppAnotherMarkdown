@@ -1,5 +1,5 @@
 ## Version History
-### NppAnotherMarkdown 0.1.5 (released 2026-01-??)
+### NppAnotherMarkdown 0.1.5 (released 2026-01-12)
 * Markdown Plugin Pack added
 
 | plugin        | description |
@@ -27,7 +27,6 @@
 | [sub](https://mdit-plugins.github.io/sub.html)                 | Plugin to support subscript |
 | [sup](https://mdit-plugins.github.io/sup.html)                 | Plugin to support superscript |
 | [tab](https://mdit-plugins.github.io/tab.html)                 | Block-level custom tabs |
-
 
 
 ### NppAnotherMarkdown 0.1.4 (released 2026-01-08)
