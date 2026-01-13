@@ -237,7 +237,7 @@ namespace AnotherMarkdown
 
       var scintillaGateway = scintillaGatewayFactory();
       var pos = scintillaGateway.GetCurrentPos();
-      scintillaGateway.InsertText(pos, $"![](./img/{args.Filename})");
+      scintillaGateway.InsertText(pos, $"![](./img/{args.Filename})\r\n");
     }
 
     private void FirstLineChanged(FirstLineChanged args)
