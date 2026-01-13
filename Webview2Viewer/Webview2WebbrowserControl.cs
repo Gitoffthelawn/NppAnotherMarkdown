@@ -226,11 +226,18 @@ namespace Webview2Viewer
       try {
         if (_webViewInit != null) {
           await _webViewInit;
-          Task task = null;
+          var tcs = new TaskCompletionSource<bool>();
           var asyncResult = _webView.BeginInvoke(new Action(() => {
-            task = action();
+            try {
+              var task = action();
+              task.ContinueWith(t => tcs.SetResult(true));
+            }
+            catch (Exception ex) {
+              tcs.SetException(ex);
+            }
           }));
-          var _ = task.ContinueWith(t => _webView.EndInvoke(asyncResult));
+          await tcs.Task;
+          _webView.EndInvoke(asyncResult);
         }
       }
       catch (Exception) { }
