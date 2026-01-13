@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -229,15 +230,52 @@ namespace AnotherMarkdown
     private void PasteImage(PasteImage args)
     {
       var path = _nppGateway.GetCurrentFilePath();
-      var folder = Path.GetDirectoryName(path) + "/img";
-      if (!Directory.Exists(folder)) {
-        Directory.CreateDirectory(folder);
+      var rootDir = Path.GetDirectoryName(path);
+      var targetDir = Path.Combine(rootDir, Path.GetDirectoryName(args.Filename));
+
+      if (!Directory.Exists(targetDir)) {
+        Directory.CreateDirectory(targetDir);
       }
-      File.WriteAllBytes(folder + "/" + args.Filename, args.Content);
+
+      var extension = Path.GetExtension(args.Filename).ToLower().Substring(1);
+      var sameFiles = Directory.GetFiles(targetDir, $"*.{extension}", SearchOption.TopDirectoryOnly);
+      string filename = null;
+
+      if (sameFiles.Length != 0) {
+        using (var md5 = MD5.Create()) {
+          var hash2 = string.Join("", md5.ComputeHash(args.Content).Select(li => $"{li}:X2"));
+
+          foreach (var file in sameFiles) {
+            var hash1 = string.Join("", md5.ComputeHash(File.ReadAllBytes(file)).Select(li => $"{li}:X2"));
+            if (hash1 == hash2) {
+              filename = file;
+              break;
+            }
+          }
+        }
+      }
+
+      if (filename == null) {
+        var index = 10;
+        while (true) {
+          var fname = $"{index:D3}";
+          if (Directory.GetFiles(targetDir, $"{fname}.*", SearchOption.TopDirectoryOnly).Length == 0) {
+            break;
+          }
+          index += 5;
+        }
+
+        filename = (targetDir + $"/{index:D3}.{extension}").Replace("\\", "/");
+        File.WriteAllBytes(filename, args.Content);
+      }
+
+      Uri rootUri = new Uri(rootDir + Path.DirectorySeparatorChar);
+      Uri fileUri = new Uri(filename);
+      var relativePath = rootUri.MakeRelativeUri(fileUri).ToString();
 
       var scintillaGateway = scintillaGatewayFactory();
       var pos = scintillaGateway.GetCurrentPos();
-      scintillaGateway.InsertText(pos, $"![](./img/{args.Filename})\r\n");
+      scintillaGateway.InsertText(pos, $"![](./{relativePath})\r\n");
     }
 
     private void FirstLineChanged(FirstLineChanged args)

@@ -403,30 +403,35 @@ window.viewPlugin = (() => {
         }
 
         context.postRender.push(async() => {
-          const config = await (await fetch(configFile)).json();
-          config.default.basePath = (configFile.match(/^(.*)(\/)[^\/]*$/))[1] + "/";
+          try {
+            const config = await (await fetch(configFile)).json();
+            config.default.basePath = (configFile.match(/^(.*)(\/)[^\/]*$/))[1] + "/";
 
-          const scene = {
-            elementId: `pano${panoramaId}`,
-            configText: JSON.stringify(config)
-          }
+            const scene = {
+              elementId: `pano${panoramaId}`,
+              configText: JSON.stringify(config)
+            }
 
-          if (context[sceneId]) {
-            if (context[sceneId].div && context[sceneId].configText === scene.configText) {
-              const element = document.getElementById(scene.elementId);
-              if (element) {
-                const parentElement = element.parentElement;
-                parentElement.removeChild(element);
-                parentElement.appendChild(context[sceneId].div);
-                delete context[sceneId].div;
-                return;
+            if (context[sceneId]) {
+              if (context[sceneId].div && context[sceneId].configText === scene.configText) {
+                const element = document.getElementById(scene.elementId);
+                if (element) {
+                  const parentElement = element.parentElement;
+                  parentElement.removeChild(element);
+                  parentElement.appendChild(context[sceneId].div);
+                  delete context[sceneId].div;
+                  return;
+                }
               }
             }
-          }
 
-          context[sceneId] = scene;
-          await data.loader;
-          pannellum.viewer(`pano${panoramaId}`, config);
+            context[sceneId] = scene;
+            await data.loader;
+            pannellum.viewer(`pano${panoramaId}`, config);
+          }
+          catch(err) {
+            console.error({ err });
+          }
         });
 
         return `
@@ -586,6 +591,25 @@ window.viewPlugin = (() => {
 
     context['initDragAndDrop'] = true;
 
+    async function apiPasteImage(file) {
+      var fetchResult = Promise.withResolvers();
+      const reader = new FileReader();
+      reader.onload = async(ev) => {
+        try {
+          const blob = new Blob([ev.target.result], { type: file.type });
+          const fd = new FormData();
+          fd.append("image", blob, "./img/" + file.name);
+          await fetch('http://api.example/paste-image', { method: "POST", body: fd });
+          fetchResult.resolve();
+        }
+        catch(err) {
+          fetchResult.reject(err);
+        }
+      };
+      reader.readAsDataURL(file);
+      await fetchResult.promise;
+    }
+
     ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
       dropzone.addEventListener(eventName, e => e.preventDefault());
     });
@@ -601,25 +625,9 @@ window.viewPlugin = (() => {
       dropzone.classList.remove("dragover");
       const files = [...e.dataTransfer.files];
       for(const file of files) {
-        if (!file.type.startsWith("image/")) {
-          return;
+        if (file.type.startsWith("image/")) {
+          await apiPasteImage(file);
         }
-        const fd = new FormData();
-        fd.append("image", file, file.name);
-
-        await fetch("http://api.example/paste-image", {
-          method: "POST",
-          body: fd
-        });
-
-        const reader = new FileReader();
-        reader.onload = async(ev) => {
-          const blob = new Blob([ev.target.result], { type: file.type });
-          const fd = new FormData();
-          fd.append("image", blob, file.name);
-          await fetch('http://api.example/paste-image', { method: "POST", body: fd });
-        };
-        reader.readAsDataURL(file);
       }
     });
 
@@ -628,15 +636,12 @@ window.viewPlugin = (() => {
       e.preventDefault();
       for(const entry of entries) {
         if (entry.type.startsWith("image/")) {
-          e.preventDefault(); // важно — иначе браузер может вставить мусор
-
+          e.preventDefault();
           const file = entry.getAsFile();
           if (file) {
-            const fd = new FormData();
-            fd.append("image", file, file.name);
-            await fetch('http://api.example/paste-image', { method: "POST", body: fd });
+            await apiPasteImage(file);
           }
-        }  
+        }
       }
     });
   }
