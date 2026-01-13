@@ -21,6 +21,7 @@ window.viewPlugin = (() => {
 
     const dependencies = [
       "detect-charset.js",
+      "markdown/editor.css",
       "markdown/markdown-it@14.1.0.min.js",
       "markdown/markdown-it-linemark.js"
     ]
@@ -222,6 +223,8 @@ window.viewPlugin = (() => {
       document.head.appendChild(newScript);
       document.head.removeChild(newScript);
     });
+
+    initDragAndDrop(container);
   }
 
   function parseQuery(str) {
@@ -574,6 +577,69 @@ window.viewPlugin = (() => {
     await Promise.all(promises);
   }
 
+  function initDragAndDrop(dropzone) {
+    if (context['initDragAndDrop'] === true) {
+      return;
+    }
+
+    dropzone = document.body;
+
+    context['initDragAndDrop'] = true;
+
+    ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+      dropzone.addEventListener(eventName, e => e.preventDefault());
+    });
+
+    dropzone.addEventListener("dragover", () => {
+      dropzone.classList.add("dragover");
+    });
+
+    dropzone.addEventListener("dragleave", () => {
+      dropzone.classList.remove("dragover");
+    });
+    dropzone.addEventListener("drop", async (e) => {
+      dropzone.classList.remove("dragover");
+      const files = [...e.dataTransfer.files];
+      for(const file of files) {
+        if (!file.type.startsWith("image/")) {
+          return;
+        }
+        const fd = new FormData();
+        fd.append("image", file, file.name);
+
+        await fetch("http://api.example/paste-image", {
+          method: "POST",
+          body: fd
+        });
+
+        const reader = new FileReader();
+        reader.onload = async(ev) => {
+          const blob = new Blob([ev.target.result], { type: file.type });
+          const fd = new FormData();
+          fd.append("image", blob, file.name);
+          await fetch('http://api.example/paste-image', { method: "POST", body: fd });
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.addEventListener("paste", async (e) => {
+      const entries = e.clipboardData?.items ?? [];
+      e.preventDefault();
+      for(const entry of entries) {
+        if (entry.type.startsWith("image/")) {
+          e.preventDefault(); // важно — иначе браузер может вставить мусор
+
+          const file = entry.getAsFile();
+          if (file) {
+            const fd = new FormData();
+            fd.append("image", file, file.name);
+            await fetch('http://api.example/paste-image', { method: "POST", body: fd });
+          }
+        }  
+      }
+    });
+  }
 
   return {
     setDocument,

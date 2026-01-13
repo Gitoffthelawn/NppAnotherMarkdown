@@ -28,6 +28,7 @@ namespace AnotherMarkdown
               _previewForm = MarkdownPreviewForm.InitViewer(_settings, HandleWndProc);
               _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
               _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
+              _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
             }
           }
         }
@@ -223,6 +224,20 @@ namespace AnotherMarkdown
           RenderMarkdownDirect();
         }
       }
+    }
+
+    private void PasteImage(PasteImage args)
+    {
+      var path = _nppGateway.GetCurrentFilePath();
+      var folder = Path.GetDirectoryName(path) + "/img";
+      if (!Directory.Exists(folder)) {
+        Directory.CreateDirectory(folder);
+      }
+      File.WriteAllBytes(folder + "/" + args.Filename, args.Content);
+
+      var scintillaGateway = scintillaGatewayFactory();
+      var pos = scintillaGateway.GetCurrentPos();
+      scintillaGateway.InsertText(pos, $"![](./img/{args.Filename})");
     }
 
     private void FirstLineChanged(FirstLineChanged args)
