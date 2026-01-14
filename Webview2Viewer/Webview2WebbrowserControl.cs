@@ -11,6 +11,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PanelCommon;
 using Webview2Viewer.Web;
+using WebView2 = Microsoft.Web.WebView2.WinForms.WebView2;
 
 namespace Webview2Viewer
 {
@@ -30,23 +31,22 @@ namespace Webview2Viewer
       _webView = null;
     }
 
-    public Task InitializeAsync(ISettings settings, IEventDispatcher eventDispatcher)
+    public void Initialize(ISettings settings, IEventDispatcher eventDispatcher)
     {
       lock (_webViewInitLock) {
-        if (_webViewInit == null) {
+        if (_webView == null) {
           _settings = settings;
           _on = eventDispatcher;
-          _webViewInit = InitializeWebViewAsync();
+          _webView = InitializeWebViewAsync();
         }
       }
-      return _webViewInit;
     }
 
-    private async Task InitializeWebViewAsync()
+    private async Task<WebView2> InitializeWebViewAsync()
     {
       var cacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), CONFIG_FOLDER_NAME, "webview2");
 
-      var webView = new Microsoft.Web.WebView2.WinForms.WebView2();
+      var webView = new WebView2();
       var opt = new CoreWebView2EnvironmentOptions();
       var webEnvironment = await CoreWebView2Environment.CreateAsync(null, cacheDir, opt);
       await webView.EnsureCoreWebView2Async(webEnvironment);
@@ -61,18 +61,18 @@ namespace Webview2Viewer
       webView.NavigationStarting += OnWebBrowser_NavigationStarting;
       webView.ZoomFactor = ConvertToZoomFactor(_settings.ZoomLevel);
       webView.CoreWebView2.WebResourceRequested += CoreWebView2_WebResourceRequested;
-      _webView = webView;
 
       var fs = new LocalFileService(webEnvironment, "local.example", _on);
-      AddWebService(fs);
+      AddWebService(webView, fs);
 
       var api = new ApiService(webEnvironment, "api.example", _on);
-      AddWebService(api);
+      AddWebService(webView,api);
+      return webView;
     }
 
-    private void AddWebService(IWebService webService)
+    private void AddWebService(WebView2 webView, IWebService webService)
     {
-      _webView.CoreWebView2.AddWebResourceRequestedFilter($"http://{webService.Hostname}/*", CoreWebView2WebResourceContext.All);
+      webView.CoreWebView2.AddWebResourceRequestedFilter($"http://{webService.Hostname}/*", CoreWebView2WebResourceContext.All);
       _webServices.Add(webService);
     }
 
@@ -90,7 +90,9 @@ namespace Webview2Viewer
 
     public void AddToHost(Control host)
     {
-      host.Controls.Add(_webView);
+      ExecuteWebviewAction((webView) => {
+        host.Controls.Add(webView);
+      });
     }
 
     public void ScrollToElementWithLineNo(int lineNo)
@@ -98,10 +100,10 @@ namespace Webview2Viewer
       if (lineNo <= 0) {
         lineNo = 0;
       }
-      ExecuteWebviewAction(() => _webView.ExecuteScriptAsync($"window.scrollToLine({lineNo})")).Wait();
+      ExecuteWebviewAction((webView) => webView.ExecuteScriptAsync($"window.scrollToLine({lineNo})"));
     }
 
-    public async Task SetContent(string content, string documentPath)
+    public async Task SetContentAsync(string content, string documentPath)
     {
       var fs = _webServices.OfType<LocalFileService>().First();
 
@@ -114,9 +116,7 @@ namespace Webview2Viewer
         cssFile = _settings.IsDarkModeEnabled ? _settings.DefaultDarkModeCssFile : _settings.DefaultCssFile;
       }
       var lineMark = (_settings.SyncViewWithFirstVisibleLine || _settings.SyncViewWithCaretPosition);
-
-
-      var reload = (_documentPath != documentPath);
+            var reload = (_documentPath != documentPath);
       reload = reload || (_assetPath != assetsPath);
       reload = reload || (_cssFile != cssFile);
       reload = reload || (_lineMark != lineMark);
@@ -124,8 +124,8 @@ namespace Webview2Viewer
       reload = reload || (_enabledMarkdownPlugins != string.Join(",", _settings.EnabledMarkdownPlugins));
 
       if (_assetPath != assetsPath) {
-        await ExecuteWebviewAction(() => {
-          _webView.CoreWebView2.SetVirtualHostNameToFolderMapping("assets.example", assetsPath, CoreWebView2HostResourceAccessKind.Allow);
+        await ExecuteWebviewActionAsync((webView) => {
+          webView.CoreWebView2.SetVirtualHostNameToFolderMapping("assets.example", assetsPath, CoreWebView2HostResourceAccessKind.Allow);
         });
         _assetPath = assetsPath;
       }
@@ -168,21 +168,23 @@ namespace Webview2Viewer
 
         loader = loader.Replace("__OPTIONS__", JsonConvert.SerializeObject(options));
 
-        await ExecuteWebviewAction(() => _webView.NavigateToString(loader));
+        await ExecuteWebviewActionAsync((webView) => {
+          webView.NavigateToString(loader);
+        });
         await SetZoomLevel(_settings.ZoomLevel);
         
       }
       else {
-        await ExecuteWebviewAction(() => _webView.ExecuteScriptAsync("window.contentChanged();"));
+        await ExecuteWebviewActionAsync((webView) => webView.ExecuteScriptAsync("window.contentChanged();"));
       }
     }
 
     public async Task SetZoomLevel(int zoomLevel)
     {
       double zoomFactor = ConvertToZoomFactor(zoomLevel);
-      await ExecuteWebviewAction(() => {
-        if (_webView.ZoomFactor != zoomFactor) {
-          _webView.ZoomFactor = zoomFactor;
+      await ExecuteWebviewActionAsync((webView) => {
+        if (webView.ZoomFactor != zoomFactor) {
+          webView.ZoomFactor = zoomFactor;
         }
       });
     }
@@ -210,26 +212,46 @@ namespace Webview2Viewer
       }
     }
 
-    private async Task ExecuteWebviewAction(Action action)
+    private void ExecuteWebviewAction(Func<WebView2, Task> action)
+    {
+      var asyncTask = new Task(async () => {
+        await ExecuteWebviewActionAsync(action);
+      });
+
+      asyncTask.Start(TaskScheduler.FromCurrentSynchronizationContext());
+      asyncTask.Wait();
+    }
+
+    private void ExecuteWebviewAction(Action<WebView2> action)
+    {
+      var asyncTask = new Task(async () => {
+        await ExecuteWebviewActionAsync(action);
+      });
+
+      asyncTask.Start(TaskScheduler.FromCurrentSynchronizationContext());
+      asyncTask.Wait();
+    }
+
+    private async Task ExecuteWebviewActionAsync(Action<WebView2> action)
     {
       try {
-        if (_webViewInit != null) {
-          await _webViewInit;
-          _webView.Invoke(action);
+        if (_webView != null) {
+          var webView = await _webView;
+          webView.Invoke(new Action(() => action(webView)));
         }
       }
       catch (Exception) { }
     }
 
-    private async Task ExecuteWebviewAction(Func<Task> action)
+    private async Task ExecuteWebviewActionAsync(Func<WebView2, Task> action)
     {
       try {
-        if (_webViewInit != null) {
-          await _webViewInit;
+        if (_webView != null) {
+          var webView = await _webView;
           var tcs = new TaskCompletionSource<bool>();
-          var asyncResult = _webView.BeginInvoke(new Action(() => {
+          var asyncResult = webView.BeginInvoke(new Action(() => {
             try {
-              var task = action();
+              var task = action(webView);
               task.ContinueWith(t => tcs.SetResult(true));
             }
             catch (Exception ex) {
@@ -237,7 +259,7 @@ namespace Webview2Viewer
             }
           }));
           await tcs.Task;
-          _webView.EndInvoke(asyncResult);
+          webView.EndInvoke(asyncResult);
         }
       }
       catch (Exception) { }
@@ -245,9 +267,8 @@ namespace Webview2Viewer
 
     const string CONFIG_FOLDER_NAME = "AnotherMarkdown";
 
-    private Microsoft.Web.WebView2.WinForms.WebView2 _webView;
+    private Task<WebView2> _webView;
     private object _webViewInitLock = new object();
-    private Task _webViewInit;
     private string _cssFile;
     private string _assetPath;
     private ISettings _settings;

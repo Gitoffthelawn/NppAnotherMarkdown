@@ -26,10 +26,15 @@ namespace AnotherMarkdown
         if (_previewForm == null) {
           lock (_lock) {
             if (_previewForm == null) {
-              _previewForm = MarkdownPreviewForm.InitViewer(_settings, HandleWndProc);
-              _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
-              _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
-              _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
+              try {
+                _previewForm = MarkdownPreviewForm.Create(_settings, HandleWndProc);
+                _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
+                _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
+                _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
+              }
+              catch (Exception ex) {
+                Console.WriteLine(ex.ToString());
+              }
             }
           }
         }
