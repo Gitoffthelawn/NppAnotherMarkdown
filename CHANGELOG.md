@@ -1,4 +1,10 @@
 ## Version History
+
+### NppAnotherMarkdown 0.1.6 (released 2026-01-??)
+
+* Support drag-and-drop and CTRL+V insert images into markdown document.
+Images stored in folder "./img" near markdown document
+
 ### NppAnotherMarkdown 0.1.5 (released 2026-01-12)
 * Markdown Plugin Pack added
 
