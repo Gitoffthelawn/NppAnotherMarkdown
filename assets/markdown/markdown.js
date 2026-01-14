@@ -33,6 +33,12 @@ window.viewPlugin = (() => {
         "markdown/markdown-it-katex@0.24.1.min.js"
       ]);
     }
+    if (options["md.extensions"].includes("highlightjs")) {
+      dependencies.push(...[
+        "markdown/plugin-higlightjs/github.min.css",
+        "markdown/markdown-it-hilightjs@11.11.1.min.js"
+      ]);
+    }
 
     if ([
       "abbr",
@@ -111,14 +117,26 @@ window.viewPlugin = (() => {
     context.documentReady = renderCompleted.promise;
     context.postRender = [];
 
-    const md = window.markdownit({
+    const markdownItOptions = {
       html: true
-    });
+    }
+    if (options["md.extensions"].includes("highlightjs")) {
+      markdownItOptions['highlight'] = function (str, lang) {
+        const hljs = window.markdownItHighlightJs;
+        if (lang && hljs.getLanguage(lang)) {
+          try {
+            return hljs.highlight(str, { language: lang }).value;
+          }
+          catch (err) {}
+        }
+        return ''; // use external default escaping
+      }
+    }
 
+    const md = window.markdownit(markdownItOptions);
     if (options["md.extensions"].includes("attrs")) {
       md.use(window.markdownItAttrs);
     }
-
     const embed = [];
     if (options["md.extensions"].includes("qrcode")) {
       embed.push(embedQrCode());
@@ -135,6 +153,7 @@ window.viewPlugin = (() => {
     if (options["md.extensions"].includes("katex")) {
       md.use(window.markdownItKatex, {});
     }
+
     if (options["md.extensions"].includes("emoji")) {
       md.use(window.markdownItEmoji, {});
     }

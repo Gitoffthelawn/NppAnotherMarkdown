@@ -9,6 +9,8 @@ Location can be changed by edit [assets/markdown/markdown.js]().
 
 - Added navigation over existing Markdown files when clicking a link to such a file in the preview window; previous behavior: such navigation was ignored.
 - Preserve preview position after switch between documents
+- highlight.js: code syntax highlight plugin added. Enable it via settings  
+![](help/plugin-highlight.jpg)
 
 ### NppAnotherMarkdown 0.1.5 (released 2026-01-12)
 * Markdown Plugin Pack added
