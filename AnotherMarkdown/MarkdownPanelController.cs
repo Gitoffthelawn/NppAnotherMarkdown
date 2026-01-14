@@ -31,6 +31,7 @@ namespace AnotherMarkdown
                 _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
                 _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
                 _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
+                _previewForm.OnEvent.Navigate += (_, e) => OpenFile(e);
               }
               catch (Exception ex) {
                 Console.WriteLine(ex.ToString());
@@ -230,6 +231,14 @@ namespace AnotherMarkdown
           RenderMarkdownDirect();
         }
       }
+    }
+
+    private void OpenFile(NavigateTo args)
+    {
+      if (!File.Exists(args.Filename)) {
+        return;      
+      }
+      Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) NppMsg.NPPM_DOOPEN, 0, args.Filename);
     }
 
     private void PasteImage(PasteImage args)

@@ -205,6 +205,12 @@ namespace Webview2Viewer
         var p = new Process();
         var navUri = new Uri(e.Uri);
         if (navUri.DnsSafeHost == "local.example") {
+          if (_on.Navigate != null && navUri.AbsolutePath.EndsWith(".md")) {
+            var path = HttpUtility2.UriToPath(navUri.AbsolutePath);
+            if (File.Exists(path)) {
+              _on.Navigate(this, new NavigateTo { Filename = path });
+            }
+          }
           return;
         }
         p.StartInfo = new ProcessStartInfo(e.Uri);

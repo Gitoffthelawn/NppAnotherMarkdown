@@ -46,6 +46,7 @@
     <Compile Include="FirstLineChanged.cs" />
     <Compile Include="IEventDispatcher.cs" />
     <Compile Include="ISettings.cs" />
+    <Compile Include="NavigateTo.cs" />
     <Compile Include="PasteImage.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
