@@ -119,16 +119,7 @@ namespace AnotherMarkdown
             }
           }
           else if (IsPanelVisible && _settings.SyncViewWithFirstVisibleLine) {
-            var scintillaGateway = scintillaGatewayFactory();
-            var currentPos = scintillaGateway.GetFirstVisibleLine();
-
-            if (_currentFirstVisibleLine != currentPos) {
-              _currentFirstVisibleLine = currentPos;
-              if (_skipSyncEventsDue < DateTime.UtcNow) {
-                var docLine = scintillaGateway.DocLineFromVisible(currentPos);
-                ScrollToElementAtLineNo(docLine);
-              }
-            }
+            _ = SyncWithFirstVisibleLineTask();
           }
           break;
         }
@@ -151,6 +142,21 @@ namespace AnotherMarkdown
         case (uint) SciMsg.SCN_MODIFIED: {
           RenderMarkdownDeferred();
           break;
+        }
+      }
+    }
+
+    private async Task SyncWithFirstVisibleLineTask()
+    {
+      await Task.Delay(50);
+      var scintillaGateway = scintillaGatewayFactory();
+      var currentPos = scintillaGateway.GetFirstVisibleLine();
+
+      if (_currentFirstVisibleLine != currentPos) {
+        _currentFirstVisibleLine = currentPos;
+        if (_skipSyncEventsDue < DateTime.UtcNow) {
+          var docLine = scintillaGateway.DocLineFromVisible(currentPos);
+          ScrollToElementAtLineNo(docLine);
         }
       }
     }
@@ -181,7 +187,8 @@ namespace AnotherMarkdown
     private void RenderMarkdownDirect()
     {
       if (IsPanelVisible) {
-        PreviewForm.RenderMarkdown(GetCurrentEditorText(), _nppGateway.GetCurrentFilePath());
+        _currentFile = _nppGateway.GetCurrentFilePath();
+        PreviewForm.RenderMarkdown(GetCurrentEditorText(), _currentFile);
       }
     }
 
@@ -193,8 +200,12 @@ namespace AnotherMarkdown
 
     private void ScrollToElementAtLineNo(int lineNo)
     {
+
       if (IsPanelVisible) {
-        PreviewForm.ScrollToElementWithLineNo(lineNo);
+        var currentFile = _nppGateway.GetCurrentFilePath();
+        if (currentFile == _currentFile) {
+          PreviewForm.ScrollToElementWithLineNo(lineNo);
+        }
       }
     }
 
@@ -258,7 +269,6 @@ namespace AnotherMarkdown
       if (sameFiles.Length != 0) {
         using (var md5 = MD5.Create()) {
           var hash2 = string.Join("", md5.ComputeHash(args.Content).Select(li => $"{li}:X2"));
-
           foreach (var file in sameFiles) {
             var hash1 = string.Join("", md5.ComputeHash(File.ReadAllBytes(file)).Select(li => $"{li}:X2"));
             if (hash1 == hash2) {
@@ -625,5 +635,6 @@ namespace AnotherMarkdown
     private Bitmap _iconBmp;
     private bool _disposedValue;
     private DateTime _skipSyncEventsDue = DateTime.MinValue;
+    private string _currentFile;
   }
 }

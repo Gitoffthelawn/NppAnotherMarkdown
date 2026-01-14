@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -136,6 +137,13 @@ namespace Webview2Viewer
       fs.SetContent(documentPath, content);
 
       if (reload) {
+        if (!string.IsNullOrEmpty(_documentPath) && _documentPath != documentPath) {
+          await ExecuteWebviewActionAsync(async (webView) => {
+            var value = await webView.ExecuteScriptAsync("window.pageYOffset");
+            _preservePosition[_documentPath] = (int) double.Parse(value, CultureInfo.InvariantCulture);
+          });
+        }
+
         _documentPath = documentPath;
         _cssFile = cssFile;
         _lineMark = lineMark;
@@ -163,6 +171,9 @@ namespace Webview2Viewer
           options["css"] = cssFile;
           options["lineMark"] = (_settings.SyncViewWithFirstVisibleLine || _settings.SyncViewWithCaretPosition);
           options["trackFirstLine"] = _settings.SyncViewWithFirstVisibleLine;
+          if (_preservePosition.TryGetValue(_documentPath, out var pageYOffset)) {
+            options["pageYOffset"] = pageYOffset;
+          }
           options["md.extensions"] = JToken.FromObject(_settings.EnabledMarkdownPlugins);
         }
 
@@ -258,7 +269,9 @@ namespace Webview2Viewer
           var asyncResult = webView.BeginInvoke(new Action(() => {
             try {
               var task = action(webView);
-              task.ContinueWith(t => tcs.SetResult(true));
+              task.ContinueWith(t => {
+                tcs.SetResult(true);
+              });
             }
             catch (Exception ex) {
               tcs.SetException(ex);
@@ -284,6 +297,7 @@ namespace Webview2Viewer
     private bool _trackFirstLine;
     private string _enabledMarkdownPlugins;
 
+    private Dictionary<string, double> _preservePosition = new Dictionary<string, double>();
     private List<IWebService> _webServices = new List<IWebService>();
     private IEventDispatcher _on;
   }

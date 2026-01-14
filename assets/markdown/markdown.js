@@ -12,6 +12,7 @@ window.viewPlugin = (() => {
       modified: false,
       lineMark: false,
       trackFirstLine: false,
+      pageYOffset: null,
       "md.extensions": []
     }
     options = { ...options, ...args };
@@ -212,7 +213,6 @@ window.viewPlugin = (() => {
       context.postRender = [];
     }
     renderCompleted.resolve();
-
     container.querySelectorAll("script").forEach((oldScript) => {
       const newScript = document.createElement("script");
       if (oldScript.src) {
@@ -225,6 +225,66 @@ window.viewPlugin = (() => {
     });
 
     initDragAndDrop(container);
+    insertOrUpdateSpacer();
+
+    if (options.pageYOffset && options.pageYOffset !== 0) {
+      (async() => {
+
+        await new Promise((resolve) => setTimeout(() => resolve(), 100));
+        await waitForImages();
+        setDelayScrollToLine();
+        window.scrollTo({ top: options.pageYOffset })
+
+        await waitForDocumentStable();
+        setDelayScrollToLine();
+        window.scrollTo({ top: options.pageYOffset })
+      })();
+    }
+  }
+
+  function waitForDocumentStable(timeout = 60) {
+    return new Promise(resolve => {
+      let observer;
+      let timer;
+
+      const debouncedResolve = () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          observer.disconnect(); // останавливаем наблюдение
+          resolve();
+        }, timeout);
+      };
+
+      observer = new MutationObserver(debouncedResolve);
+      observer.observe(document.body, {
+        childList: true,    // добавление/удаление элементов
+        subtree: true,      // следить во всём DOM
+        attributes: true,   // изменения атрибутов
+        characterData: true // изменения текста
+      });
+
+      // стартовый таймер на случай, если изменений нет
+      timer = setTimeout(() => {
+        observer.disconnect();
+        resolve();
+      }, timeout);
+    });
+  }
+
+  function waitForImages(timeout = 5000) {
+    const images = Array.from(document.images);
+    const promises = images.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        const onLoadOrError = () => { resolve(); img.removeEventListener('load', onLoadOrError); img.removeEventListener('error', onLoadOrError); };
+        img.addEventListener('load', onLoadOrError);
+        img.addEventListener('error', onLoadOrError);
+      });
+    });
+    return Promise.race([
+      Promise.all(promises),
+      new Promise(resolve => setTimeout(resolve, timeout))
+    ]);
   }
 
   function parseQuery(str) {
@@ -441,11 +501,16 @@ window.viewPlugin = (() => {
       }
     }
   }
+
+  function setDelayScrollToLine() {
+    clearTimeout(context.scrollToLineTimeoutId)
+    context.scrollToLineTimeoutId = setTimeout(() => context.trackFirstLineActive = false, 1500);
+  }
+
   function scrollToLine(line) {
     if (line === 0) {
       context.trackFirstLineActive = true;
-      clearTimeout(context.scrollToLineTimeoutId)
-      context.scrollToLineTimeoutId = setTimeout(() => context.trackFirstLineActive = false, 1500);
+      setDelayScrollToLine();
 
       window.scrollTo({
         top: 0,
@@ -466,36 +531,35 @@ window.viewPlugin = (() => {
       }
     }
 
-    var spacer = document.getElementById('spacer');
-    var rect = element.getBoundingClientRect();
+    const rect = element.getBoundingClientRect();
+    const requiredScrollTop = rect.top + window.pageYOffset;
 
-    var elementTop = rect.top + window.pageYOffset;
-    var requiredScrollTop = elementTop;
-    var maxScrollTop = document.documentElement.scrollHeight - window.innerHeight;
-    if (requiredScrollTop > maxScrollTop) {
-      var extraHeight = requiredScrollTop - maxScrollTop;
-      if (!spacer) {
-        spacer = document.createElement('div');
-        spacer.id = 'spacer';
-        spacer.style.height = extraHeight + 'px';
-        spacer.style.width = '1px';
-        spacer.style.pointerEvents = 'none';
-        document.body.appendChild(spacer);
-      }
-      else {
-        var spacerRect = spacer.getBoundingClientRect();
-        spacer.style.height = extraHeight + spacerRect.height + 'px';
-      }
-    }
-
+    insertOrUpdateSpacer();
     context.trackFirstLineActive = true;
-    clearTimeout(context.scrollToLineTimeoutId);
-    context.scrollToLineTimeoutId = setTimeout(() => context.trackFirstLineActive = false, 1500);
+    setDelayScrollToLine();
 
     window.scrollTo({
       top: requiredScrollTop,
       behavior: 'smooth'
     });
+  }
+
+  async function insertOrUpdateSpacer() {
+    var spacer = document.getElementById('spacer');
+    if (!spacer) {
+      spacer = document.createElement('div');
+      spacer.id = 'spacer';
+      spacer.style.height = window.innerHeight + 'px';
+      spacer.style.width = '1px';
+      spacer.style.pointerEvents = 'none';
+      document.body.appendChild(spacer);
+    }
+    else {
+      const height = window.innerHeight + 'px';
+      if (spacer.style.height !== height) {
+        spacer.style.height = height;
+      }
+    }
   }
 
   async function sendWebEvent(name, payload) {
