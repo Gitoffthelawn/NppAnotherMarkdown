@@ -106,6 +106,7 @@ namespace Webview2Viewer
 
     public async Task SetContentAsync(string content, string documentPath)
     {
+      await _webView;
       var fs = _webServices.OfType<LocalFileService>().First();
 
       var assetsPath = (!string.IsNullOrEmpty(_settings.AssetsPath) && Directory.Exists(_settings.AssetsPath))
