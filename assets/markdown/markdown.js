@@ -468,7 +468,7 @@ window.viewPlugin = (() => {
     return {
       name: "pano360",
       allowInline: false,
-      setup: (configFile) => {
+      setup: (sourceFile) => {
         if (!data.loader) {
           data.loader = loadScripts(['markdown/pannellum.css', 'markdown/pannellum.js']);
         }
@@ -483,8 +483,32 @@ window.viewPlugin = (() => {
 
         context.postRender.push(async() => {
           try {
-            const config = await (await fetch(configFile)).json();
-            config.default.basePath = (configFile.match(/^(.*)(\/)[^\/]*$/))[1] + "/";
+            let config;
+            if (/\.json$/.test(sourceFile)) {
+              config = await (await fetch(sourceFile)).json();
+              config.default.basePath = (sourceFile.match(/^(.*)(\/)[^\/]*$/))[1] + "/";
+            }
+            else {
+              config = {
+                "default": {
+                  "firstScene": "default",
+                  "sceneFadeDuration": 1000,
+                  "autoLoad": true,
+                  "showZoomCtrl": false,
+                  "compass": false,
+                  "autoRotate": 0,
+                  "minHfov": 5,
+                  "maxHfov": 120
+                },
+                "scenes": {
+                  "default": {
+                    "type": "equirectangular",
+                    "panorama": "pano1.jpg"
+                  }
+                }
+              }
+              config.scenes.default.panorama = sourceFile;
+            }
 
             const scene = {
               elementId: `pano${panoramaId}`,
