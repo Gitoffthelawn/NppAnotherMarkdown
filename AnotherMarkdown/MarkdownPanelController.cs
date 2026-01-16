@@ -27,11 +27,12 @@ namespace AnotherMarkdown
           lock (_lock) {
             if (_previewForm == null) {
               try {
-                _previewForm = MarkdownPreviewForm.Create(_settings, HandleWndProc);
+                _previewForm = MarkdownPreviewForm.Create(_settings);
                 _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
                 _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
                 _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
                 _previewForm.OnEvent.Navigate += (_, e) => OpenFile(e);
+                _previewForm.DockClosed += (_, e) => TogglePanelVisible();
               }
               catch (Exception ex) {
                 Console.WriteLine(ex.ToString());
@@ -46,7 +47,6 @@ namespace AnotherMarkdown
     public MarkdownPanelController()
     {
       AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
-
       scintillaGatewayFactory = PluginBase.GetGatewayFactory();
       _nppGateway = new NotepadPPGateway();
       SetIniFilePath();
@@ -487,74 +487,11 @@ namespace AnotherMarkdown
       return _icon;
     }
 
-    /// <summary>
-    /// Actions to do after the tool window was closed
-    /// </summary>
-    private void ToolWindowCloseAction()
-    {
-      TogglePanelVisible();
-    }
-
     private bool IsDarkModeEnabled()
     {
       // NPPM_ISDARKMODEENABLED (NPPMSG + 107)
       IntPtr ret = Win32.SendMessage(PluginBase.nppData._nppHandle, (uint)(Constants.NPPMSG + 107), UNUSED, UNUSED);
       return ret.ToInt32() == 1;
-    }
-
-    protected void HandleWndProc(ref Message m)
-    {
-      if (_disposedValue) {
-        return;
-      }
-
-      switch (m.Msg) {
-        case (int)WindowsMessage.WM_NOTIFY:
-          var notify = (NMHDR)Marshal.PtrToStructure(m.LParam, typeof(NMHDR));
-
-          // do not intercept Npp notifications like DMN_CLOSE, etc.
-          if (notify.hwndFrom != PluginBase.nppData._nppHandle) {
-            PreviewForm.Invalidate(true);
-            if (Environment.Is64BitProcess) {
-              SetControlParent(PreviewForm, Win32.GetWindowLongPtr, Win32.SetWindowLongPtr);
-            }
-            else {
-              SetControlParent(PreviewForm, Win32.GetWindowLong, Win32.SetWindowLong);
-            }
-
-            PreviewForm.Update();
-            return;
-          }
-
-          switch (notify.code) {
-            case (int) DockMgrMsg.DMN_CLOSE: {
-              ToolWindowCloseAction();
-              break;
-            }
-          }
-          break;
-      }
-    }
-
-    /// <summary>
-    /// Sets the <see cref="Win32.WS_EX_CONTROLPARENT"/> extended attribute on <paramref name="parent"/> and any child
-    /// controls, following @mahee96's advice on the archived Plugin.Net issue tracker. <para><seealso
-    /// href="https://github.com/kbilsted/NotepadPlusPlusPluginPack.Net/issues/17#issuecomment-683455467"/></para>
-    /// </summary>
-    /// <param name="parent">
-    /// A WinForm that's been registered with Npp's Docking Manager by sending <see cref="NppMsg.NPPM_DMMREGASDCKDLG"/>.
-    /// </param>
-    private void SetControlParent(Control parent, Func<IntPtr, int, IntPtr> wndLongGetter, Func<IntPtr, int, IntPtr, IntPtr> wndLongSetter)
-    {
-      if (parent.HasChildren) {
-        long extAttrs = (long)wndLongGetter(parent.Handle, Win32.GWL_EXSTYLE);
-        if (Win32.WS_EX_CONTROLPARENT != (extAttrs & Win32.WS_EX_CONTROLPARENT)) {
-          wndLongSetter(parent.Handle, Win32.GWL_EXSTYLE, new IntPtr(extAttrs | Win32.WS_EX_CONTROLPARENT));
-        }
-        foreach (Control c in parent.Controls) {
-          SetControlParent(c, wndLongGetter, wndLongSetter);
-        }
-      }
     }
 
     protected virtual void Dispose(bool disposing)
@@ -594,20 +531,6 @@ namespace AnotherMarkdown
       // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
       Dispose(disposing: true);
       GC.SuppressFinalize(this);
-    }
-
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct NMHDR
-    {
-      public IntPtr hwndFrom;
-      public IntPtr idFrom;
-      public int code;
-    }
-
-    public enum WindowsMessage
-    {
-      WM_NOTIFY = 0x004E
     }
 
     private bool IsPanelVisible { get; set; }
