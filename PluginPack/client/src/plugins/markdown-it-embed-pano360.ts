@@ -10,8 +10,6 @@ class MarkdownItEmbedPano360 {
   }
 
   public Render(sourceFile: string) {
-    importCss(['markdown/pannellum.css']);
-
     const panoramaId = ++this.seqId;
     const sceneId = `pano360.scene[${panoramaId}]`;
     if (scenes[sceneId]) {
@@ -22,10 +20,11 @@ class MarkdownItEmbedPano360 {
 
     MarkdownRenderContext.postRender.push(async () => {
       try {
-        let config = await readConfig(sourceFile);
-
         importCss(['markdown/pannellum.css']);
-        await importScript(['markdown/pannellum.js']);
+        const panellum = importScript(['markdown/pannellum.js']);
+
+        let config = await readConfig(sourceFile);
+        await panellum;
 
         const scene = {
           elementId: `pano${panoramaId}`,
