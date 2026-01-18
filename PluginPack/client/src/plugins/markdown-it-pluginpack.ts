@@ -29,7 +29,7 @@ import MarkdownIt from 'markdown-it'
 import markdownItTaskLists from './markdown-it-task-lists'
 import markdownItEmbedQrcode from './markdown-it-embed-qrcode'
 import markdownItEmbedPano360 from './markdown-it-embed-pano360'
-import { dynamicLoad } from '../Misc/DynamicLoad'
+import { importCss, importScript } from '../Misc/DynamicLoad'
 
 export async function markdownItPluginPack(enabled: string[], md: MarkdownIt) {
 
@@ -41,15 +41,15 @@ export async function markdownItPluginPack(enabled: string[], md: MarkdownIt) {
 
   if (enabled.includes("katex")) {
     builder.push((async () => {
-      dynamicLoad(["markdown/plugin-katex/katex@0.24.1.min.css"]);
+      importCss(["markdown/plugin-katex/katex@0.24.1.min.css"]);
       md.use(MarkdownItPluginKatex, {});
     }))
   }
 
   if (enabled.includes("highlightjs")) {
     builder.push((async () => {
-      dynamicLoad(["markdown/plugin-highlightjs/github.min.css"]);
-      await dynamicLoad(["markdown/markdown-it-highlightjs@11.11.1.min.js"]);
+      importCss(["markdown/plugin-highlightjs/github.min.css"]);
+      await importScript(["markdown/markdown-it-highlightjs@11.11.1.min.js"]);
 
       md.options.highlight = function (str, lang) {
         const hljs = (window as any).markdownItPluginHighlightJs as typeof MarkdownItPluginHighlightJs;
@@ -85,7 +85,7 @@ export async function markdownItPluginPack(enabled: string[], md: MarkdownIt) {
     md.use(abbr, {});
   }
   if (enabled.includes("alert")) {
-    dynamicLoad(["markdown/plugin-alert/alert.css"]);
+    importCss(["markdown/plugin-alert/alert.css"]);
     md.use(alert, {});
   }
   if (enabled.includes("align")) {
@@ -132,7 +132,7 @@ export async function markdownItPluginPack(enabled: string[], md: MarkdownIt) {
     md.use(ruby, {});
   }
   if (enabled.includes("spoiler")) {
-    dynamicLoad(["markdown/plugin-spoiler/spoiler.css"]);
+    importCss(["markdown/plugin-spoiler/spoiler.css"]);
     md.use(spoiler, {});
   }
   if (enabled.includes("stylize")) {

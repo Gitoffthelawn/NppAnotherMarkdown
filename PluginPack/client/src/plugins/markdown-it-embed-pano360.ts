@@ -1,18 +1,16 @@
-import { dynamicLoad } from '../Misc/DynamicLoad';
 import { Hashmap } from '../Lib/Common/Hashmap';
+import { importCss, importScript } from '../Misc/DynamicLoad';
 import { MarkdownRenderContext } from '../Misc/MarkdownRenderContext';
 
-let loader: Promise<void> | null = null;
 const scenes: Hashmap<any> = {};
+const loader: Promise<void>|null = null;
 
 class MarkdownItEmbedPano360 {
   constructor() {
   }
 
   public Render(sourceFile: string) {
-    if (!loader) {
-      loader = dynamicLoad(['markdown/pannellum.css', 'markdown/pannellum.js']);
-    }
+    importCss(['markdown/pannellum.css']);
 
     const panoramaId = ++this.seqId;
     const sceneId = `pano360.scene[${panoramaId}]`;
@@ -25,6 +23,9 @@ class MarkdownItEmbedPano360 {
     MarkdownRenderContext.postRender.push(async () => {
       try {
         let config = await readConfig(sourceFile);
+
+        importCss(['markdown/pannellum.css']);
+        await importScript(['markdown/pannellum.js']);
 
         const scene = {
           elementId: `pano${panoramaId}`,
@@ -45,7 +46,6 @@ class MarkdownItEmbedPano360 {
         }
 
         scenes[sceneId] = scene;
-        await loader;
         ((window as any).pannellum as any).viewer(`pano${panoramaId}`, config);
       }
       catch (err) {

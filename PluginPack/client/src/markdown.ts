@@ -3,16 +3,15 @@ import markdownIt, { Options as MarkdownItOptions } from 'markdown-it'
 import detect_charset from 'detect-charset'
 import markdownItLineMark from './plugins/markdown-it-linemark'
 import { IDocumentOptions, IViewPlugin } from './Contract/IViewPlugin';
-import { dynamicLoad } from './Misc/DynamicLoad';
 import { markdownItPluginPack } from './plugins/markdown-it-pluginpack';
 import { InitBottomSpacer, ScrollToLine, ScrollToPageY } from './Misc/ScrollTo';
 import { InitTrackFirstLine } from './Misc/TrackFirstLine';
 import { InitDragAndDrop } from './Misc/DragAndDrop';
 import { InitPasteContent } from './Misc/PasteContent';
 import { MarkdownRenderContext } from './Misc/MarkdownRenderContext';
-import MarkdownIt from 'markdown-it';
+import { DynamicScriptsProcessor, importCss } from './Misc/DynamicLoad';
 
-dynamicLoad(["markdown/editor.css"]);
+importCss(["markdown/editor.css"]);
 
 async function setDocument(container: HTMLElement, args: Partial<IDocumentOptions>) {
   let options: IDocumentOptions = {
@@ -63,7 +62,7 @@ async function setDocument(container: HTMLElement, args: Partial<IDocumentOption
   }
 
   if ((window as any).markdownSetup) {
-    let markdownSetup: ((md: MarkdownIt, context: typeof MarkdownRenderContext) => Promise<void>);
+    let markdownSetup: ((md: markdownIt, context: typeof MarkdownRenderContext) => Promise<void>);
     markdownSetup = (window as any).markdownSetup;
     const result = markdownSetup(md, context);
     if (result && result instanceof Promise) {
@@ -78,16 +77,7 @@ async function setDocument(container: HTMLElement, args: Partial<IDocumentOption
     context.postRender = [];
   }
   renderCompleted.resolve();
-  container.querySelectorAll("script").forEach((oldScript) => {
-    const newScript = document.createElement("script");
-    if (oldScript.src) {
-      newScript.src = oldScript.src;
-    } else {
-      newScript.textContent = oldScript.textContent;
-    }
-    document.head.appendChild(newScript);
-    document.head.removeChild(newScript);
-  });
+  DynamicScriptsProcessor(container);
 
   InitBottomSpacer();
   InitDragAndDrop();
