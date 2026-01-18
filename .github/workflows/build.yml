@@ -110,6 +110,23 @@ jobs:
             /p:Configuration=Release `
             /p:Platform=x64
 
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: PluginPack/yarn.lock
+
+      - name: Install dependencies
+        working-directory: PluginPack
+        run: yarn install --frozen-lockfile
+
+      - name: Build PluginPack
+        working-directory: PluginPack
+        run: yarn build:all
+
+
       - name: Prepare Release lib folder
         shell: pwsh
         run: |
@@ -152,6 +169,7 @@ jobs:
             Copy-Item -Force -Path $filename -Destination $releaseFolder
             Copy-Item -Force -Recurse -Path "Release\lib\" -Destination "$releaseFolder\lib"
             Copy-Item -Force -Recurse -Path "README.md","help","assets","License.txt" -Destination $releaseFolder
+            Copy-Item -Force -Recurse -Path "PluginPack\dist\js\*.js" -Destination "$releaseFolder\assets\markdown"
             return $name;
           }
           $name = Make-ReleaseFolder "AnotherMarkdown\bin\Release\AnotherMarkdown.dll" "x86"
