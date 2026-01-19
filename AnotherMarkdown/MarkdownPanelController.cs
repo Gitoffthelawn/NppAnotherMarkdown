@@ -142,7 +142,9 @@ namespace AnotherMarkdown
           break;
         }
         case (uint) SciMsg.SCN_MODIFIED: {
-          RenderMarkdownDeferred();
+          if (_skipSyncEventsDue < DateTime.UtcNow) {
+            RenderMarkdownDeferred();
+          }
           break;
         }
       }

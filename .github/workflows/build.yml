@@ -138,28 +138,6 @@ jobs:
         working-directory: PluginPack
         run: yarn build:all
 
-
-      - name: Prepare Release lib folder
-        shell: pwsh
-        run: |
-          if (Test-Path Release\lib\) {
-            Remove-Item Release\lib\ -Recurse -Force
-          }
-
-          New-Item Release\lib\ -ItemType Directory | Out-Null
-
-          Copy-Item -Force -Recurse `
-            PanelCommon\bin\Release\*.dll `
-            Release\lib\
-
-          Copy-Item -Force -Recurse `
-            Webview2Viewer\bin\Release\*.dll `
-            Release\lib\
-
-          Copy-Item -Force -Recurse `
-            Webview2Viewer\bin\Release\runtimes\ `
-            Release\lib\runtimes\
-
       - name: Create release ZIPs
         id: create-release
         shell: pwsh
@@ -171,23 +149,27 @@ jobs:
           }
 
           $version = "${{ steps.version.outputs.APP_VERSION }}"
-          function Make-ReleaseFolder($filename, $targetPlatform) {
+          function Make-ReleaseFolder($sourceDir, $targetPlatform) {
             $name = "AnotherMarkdown-$($version)-$($prefix)$($targetPlatform)";
-            $releaseFolder = "Release\$name"
-            if (Test-Path $releaseFolder) {
-                Remove-Item $releaseFolder -Recurse -Force
-            }
-            New-Item -ItemType Directory -Path $releaseFolder | Out-Null
-            Copy-Item -Force -Path $filename -Destination $releaseFolder
-            Copy-Item -Force -Recurse -Path "Release\lib\" -Destination "$releaseFolder\lib"
-            Copy-Item -Force -Recurse -Path "README.md","help","assets","License.txt" -Destination $releaseFolder
-            Copy-Item -Force -Recurse -Path "PluginPack\dist\js\*.js" -Destination "$releaseFolder\assets\markdown"
+            $targetDir = "Release/$name"
+            New-Item -ItemType Directory -Path "$targetDir" | Out-Null
+            New-Item -ItemType Directory -Path "$targetDir/lib" | Out-Null
+            New-Item -ItemType Directory -Path "$targetDir/lib/runtimes" | Out-Null
+            
+            Copy-Item -Force -Recurse -Path "$sourceDir/*.dll" -Destination "$targetDir/lib"
+            Copy-Item -Force -Recurse -Path "$sourceDir/runtimes/win-$($targetPlatform)" -Destination "$targetDir/lib/runtimes/win-$($targetPlatform)"
+            
+            Get-ChildItem "$targetDir/lib" -Recurse -Filter "AnotherMarkdown.*" | Move-Item -Destination "$targetDir" -Force
+            
+            Copy-Item -Force -Recurse -Path "README.md","CHANGELOG.md","help","assets","License.txt" -Destination "$targetDir"
+            Copy-Item -Force -Recurse -Path "PluginPack/dist/js/*.js" -Destination "$targetDir/assets/markdown"
             return $name;
           }
-          $name = Make-ReleaseFolder "AnotherMarkdown\bin\Release\AnotherMarkdown.dll" "x86"
+          
+          $name = Make-ReleaseFolder "AnotherMarkdown\bin\Release" "x86"
           "X86_NAME=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
-          $name = Make-ReleaseFolder "AnotherMarkdown\bin\Release-x64\AnotherMarkdown.dll" "x64"
+          $name = Make-ReleaseFolder "AnotherMarkdown\bin\Release-x64" "x64"
           "X64_NAME=$name" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
       - name: Upload x86 release
