@@ -44,22 +44,34 @@ jobs:
             Where-Object { $_.name -like "AnotherMarkdown-*" } |
             Sort-Object created_at -Descending
 
-          $newVersion = "0.1.0";
+          $newVersion = "0.1";
           foreach($entry in $artefacts) {
             write-host "artefact: $($entry.name)"
-            if ("$($entry.name)" -match '(\d+)\.(\d+)\.(\d+)') {
+            if ("$($entry.name)" -match '\-(\d+)\.(\d+)(\.\d+)?(\.\d+)?\-') {
               Write-Host "Last artifact created: $($entry.created_at) - $($entry.name)"
               $major = [int]$matches[1];
               $minor = [int]$matches[2];
-              $patch = [int]$matches[3];
-              if ($branch -eq "master" -and $lastCommit -imatch '^feat[\(\:]') {
-                $minor += 1;
-                $patch = 0;
+              $patch = 0;
+              if ($matches[3] -ne $null) {
+                $patch = [int] ($matches[3].Substring(1));
+              }
+              $revision = 0;
+              if ($matches[4] -ne $null) {              
+                $revision = [int] ($matches[4].Substring(1));
+              }              
+              
+              if ($branch -eq "master") {
+                if ($lastCommit -imatch '^feat[\(\:]') {
+                  $newVersion = "$major.$($minor + 1).0"
+                }
+                else {
+                  $newVersion = "$major.$minor.$($patch + 1)"
+                }
+                
               }
               else {
-                $patch += 1;
+                $newVersion = "$major.$minor.$patch.$($revision + 1)"
               }
-              $newVersion = "$major.$minor.$patch"
               break;
             }
           }
@@ -154,7 +166,7 @@ jobs:
         run: |
           $branch = "${{ github.ref_name }}"
           $prefix = ""
-          if ($branch -eq "dev") {
+          if ($branch -ne "master") {
             $prefix = "dev-"
           }
 

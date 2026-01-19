@@ -1,5 +1,9 @@
 ## Version History
 
+### NppAnotherMarkdown 0.1.7 (released 2026-01-xx)
+- Rewrite all client code with typescript
+- fix: reduce flicking text in main editor window then syncronize checklist checkbox
+
 ### NppAnotherMarkdown 0.1.6 (released 2026-01-15)
 
 - Support drag-and-drop and CTRL+V insert images into markdown preview.  
