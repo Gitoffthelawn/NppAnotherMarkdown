@@ -319,8 +319,7 @@ namespace AnotherMarkdown
     private void DocumentChanged(DocumentContentChanged args)
     {
       var scintillaGateway = scintillaGatewayFactory();
-      var firstVisible = scintillaGateway.GetFirstVisibleLine();
-      int pos = scintillaGateway.GetCurrentPos();
+
       var currentTextLength = scintillaGateway.GetLength();
       var currentText = scintillaGateway.GetText(currentTextLength + 1);
       var newText = args.Content;
@@ -336,27 +335,27 @@ namespace AnotherMarkdown
       scintillaGateway.BeginUndoAction();
       try {
         foreach (var block in diff.DiffBlocks.Reverse()) {
-          int offset = 0;
-          for (var i = 0; i <= block.DeleteStartA; i++) {
+          int deleteStartA = block.DeleteStartA;
+          for (var i = 0; i < block.DeleteStartA; i++) {
             var ch = currentText[i];
             if (char.IsHighSurrogate(ch)) {
-              offset += 2;
+              deleteStartA += 2;
               i++;
             }
             else if (ch >= 0x800) {
-              offset += 2;
+              deleteStartA += 2;
             }
             else if (ch >= 0x80) {
-              offset += 1;
+              deleteStartA += 1;
             }
           }
 
           if (block.DeleteCountA > 0) {
-            scintillaGateway.DeleteRange(block.DeleteStartA + offset, block.DeleteCountA);
+            scintillaGateway.DeleteRange(deleteStartA, block.DeleteCountA);
           }
           if (block.InsertCountB > 0) {
             var insertText = newText.Substring(block.InsertStartB, block.InsertCountB).Replace("\n", "\r\n");
-            scintillaGateway.InsertText(block.DeleteStartA + offset, insertText);
+            scintillaGateway.InsertText(deleteStartA, insertText);
           }
         }
       }
