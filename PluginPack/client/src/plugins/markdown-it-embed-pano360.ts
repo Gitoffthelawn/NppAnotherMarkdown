@@ -82,11 +82,10 @@ async function readConfig(sourceFile: string) {
       "scenes": {
         "default": {
           "type": "equirectangular",
-          "panorama": "pano1.jpg"
+          "panorama": sourceFile
         }
       }
     };
-    config.scenes.default.panorama = sourceFile;
   }
   return config;
 }
