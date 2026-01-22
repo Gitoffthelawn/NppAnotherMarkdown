@@ -125,7 +125,7 @@ namespace AnotherMarkdown
         }
         case (uint) NppMsg.NPPN_BUFFERACTIVATED: {
           if (_skipSyncEventsDue < DateTime.UtcNow) {
-            RenderMarkdownDirect(force: true);
+            RenderMarkdown(force: true);
           }
           break;
         }
@@ -133,13 +133,13 @@ namespace AnotherMarkdown
           _settings.IsDarkModeEnabled = IsDarkModeEnabled();
           if (_isPanelVisible) {
             PreviewForm.UpdateSettings(_settings);
-            RenderMarkdownDirect(force: true);
+            RenderMarkdown(force: true);
           }
           break;
         }
         case (uint) SciMsg.SCN_MODIFIED: {
           if (_skipSyncEventsDue < DateTime.UtcNow) {
-            RenderMarkdownDirect(force: false);
+            RenderMarkdown();
           }
           break;
         }
@@ -158,14 +158,6 @@ namespace AnotherMarkdown
           var docLine = scintillaGateway.DocLineFromVisible(currentPos);
           ScrollToElementAtLineNo(docLine);
         }
-      }
-    }
-
-    private void RenderMarkdownDirect(bool force)
-    {
-      if (_isPanelVisible) {
-        _currentFile = _nppGateway.GetCurrentFilePath();
-        PreviewForm.RenderMarkdown(GetCurrentEditorText(), _currentFile, force);
       }
     }
 
@@ -215,7 +207,7 @@ namespace AnotherMarkdown
         //Update Preview
         if (_isPanelVisible) {
           PreviewForm.UpdateSettings(_settings);
-          RenderMarkdownDirect(force: true);
+          RenderMarkdown(force: true);
         }
       }
     }
@@ -348,7 +340,7 @@ namespace AnotherMarkdown
       if (!_isPanelVisible) {
         TogglePanelVisible();
       }
-      RenderMarkdownDirect(force: true);
+      RenderMarkdown(force: true);
     }
 
     private void SetIniFilePath()
@@ -368,7 +360,7 @@ namespace AnotherMarkdown
       var wasSyncView = SyncViewEnabled;
       SetSyncViewWithCaretPosition(!_settings.SyncViewWithCaretPosition);
       if (SyncViewEnabled != wasSyncView) {
-        RenderMarkdownDirect(force: true);
+        RenderMarkdown(force: true);
       }
     }
 
@@ -377,7 +369,7 @@ namespace AnotherMarkdown
       var wasSyncView = SyncViewEnabled;
       SetSyncViewWithFirstVisibleLine(!_settings.SyncViewWithFirstVisibleLine);
       if (SyncViewEnabled != wasSyncView) {
-        RenderMarkdownDirect(force: true);
+        RenderMarkdown(force: true);
       }
     }
 
@@ -470,7 +462,7 @@ namespace AnotherMarkdown
 
       if (_isPanelVisible) {
         PreviewForm.UpdateSettings(_settings);
-        RenderMarkdownDirect(force: true);
+        RenderMarkdown(force: true);
       }
     }
 
@@ -492,6 +484,48 @@ namespace AnotherMarkdown
         _icon = Icon.FromHandle(_iconBmp.GetHicon());
       }
       return _icon;
+    }
+
+    public void RenderMarkdown(bool force = false)
+    {
+      lock (_renderMarkdownLock) {
+        if (force) {
+          _renderMarkdownAt = DateTime.UtcNow;
+        }
+        else {
+          if (_renderMarkdownAt == DateTime.MinValue) {
+            _renderMarkdownAt = DateTime.UtcNow.Add(InputUpdateThreshold);
+          }
+        }
+        if (_renderMarkdownTask == null || (_renderMarkdownTask.IsCompleted || _renderMarkdownTask.IsFaulted)) {
+          _renderMarkdownTask = RenderMarkdownTask();
+        }
+      }
+    }
+
+    private async Task RenderMarkdownTask()
+    {
+      try {
+        while (!_disposedValue) {
+          await Task.Delay(20);
+          if (_disposedValue) {
+            break;
+          }
+          if (_renderMarkdownAt > DateTime.UtcNow) {
+            continue;
+          }
+
+          var currentFile = _nppGateway.GetCurrentFilePath();
+          var currentText = GetCurrentEditorText();
+          _currentFile = currentFile;
+
+          await PreviewForm.RenderMarkdown(currentText, currentFile);
+        }
+      }
+      catch (Exception err) {
+        Console.WriteLine(err);
+        _renderMarkdownAt = DateTime.MinValue;
+      }
     }
 
     private bool IsDarkModeEnabled()
@@ -553,5 +587,11 @@ namespace AnotherMarkdown
     private bool _disposedValue;
     private DateTime _skipSyncEventsDue = DateTime.MinValue;
     private string _currentFile;
+
+    private DateTime _renderMarkdownAt = DateTime.MinValue;
+    private object _renderMarkdownLock = new object();
+    private Task _renderMarkdownTask;
+
+    private static readonly TimeSpan InputUpdateThreshold = TimeSpan.FromMilliseconds(200);
   }
 }

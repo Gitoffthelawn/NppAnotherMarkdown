@@ -55,61 +55,17 @@ namespace AnotherMarkdown.Forms
       statusStrip2.Visible = settings.ShowStatusbar;
     }
 
-    public void RenderMarkdown(string currentText, string filepath, bool force)
+    public async Task RenderMarkdown(string currentText, string filepath)
     {
-      lock (_renderTaskLock) {
-        _markdownContent = new MarkdownContent {
-          Path = filepath,
-          Text = currentText,
-        };
-        if (force) {
-          _markdownContentRenderAt = DateTime.MinValue;
-        }
-        else {
-          if (_markdownContentRenderAt == DateTime.MinValue) {
-            _markdownContentRenderAt = DateTime.UtcNow.Add(InputUpdateThreshold);
-          }
-        }
-
-        if (_renderTask == null || (_renderTask.IsCompleted || _renderTask.IsFaulted)) {
-          _renderTask = RenderMarkdownTask();
-        }
+      if (_webView != null) {
+        await _webView.SetContentAsync(currentText, filepath);
       }
     }
-
-    private async Task RenderMarkdownTask()
-    {
-      try {
-        while (true) {
-          await Task.Delay(20);
-          MarkdownContent content;
-          lock (_renderTaskLock) {
-            if (_markdownContent == null) {
-              _renderTask = null;
-              break;
-            }
-            content = _markdownContent.Value;
-            if (_markdownContentRenderAt > DateTime.UtcNow) {
-              continue;
-            }
-            _markdownContent = null;
-            _markdownContentRenderAt = DateTime.MinValue;
-          }
-          
-          await _webView.SetContentAsync(content.Text, content.Path);
-        }
-      }
-      catch (Exception err) {
-        Console.WriteLine(err);
-        _markdownContentRenderAt = DateTime.MinValue;
-      }
-    }
-
 
     public void ScrollToElementWithLineNo(int lineNo)
     {
       if (_webView != null) {
-        _webView.ScrollToElementWithLineNo((int) lineNo);
+        _webView.ScrollToElementWithLineNo(lineNo);
       }
     }
 
@@ -166,19 +122,26 @@ namespace AnotherMarkdown.Forms
       }
     }
 
-    private struct MarkdownContent
+    /// <summary>
+    /// Clean up any resources being used.
+    /// </summary>
+    /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+    protected override void Dispose(bool disposing)
     {
-      public string Text;
-      public string Path;
+      if (disposing) {
+        _disposed = true;
+        if (_webView != null) {
+          _webView.Dispose();
+          _webView = null;
+        }
+        if (components != null) {
+          components.Dispose();
+          components = null;
+        }
+      }
+      base.Dispose(disposing);
     }
-
-    private DateTime _markdownContentRenderAt = DateTime.MinValue;
-    private MarkdownContent? _markdownContent;
-
-    private object _renderTaskLock = new object();
-    private Task _renderTask;
     private Webview2WebbrowserControl _webView;
-
-    private static readonly TimeSpan InputUpdateThreshold = TimeSpan.FromMilliseconds(400);
+    private bool _disposed;
   }
 }
