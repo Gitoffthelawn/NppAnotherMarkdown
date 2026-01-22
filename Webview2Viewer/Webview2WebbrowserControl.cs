@@ -220,7 +220,7 @@ namespace Webview2Viewer
           if (_on.Navigate != null && navUri.AbsolutePath.EndsWith(".md")) {
             var path = HttpUtility2.UriToPath(navUri.AbsolutePath);
             if (File.Exists(path)) {
-              _on.Navigate(this, new NavigateTo { Filename = path });
+              _on.Navigate(this, new NavigateToEvent { Filename = path });
             }
           }
           return;

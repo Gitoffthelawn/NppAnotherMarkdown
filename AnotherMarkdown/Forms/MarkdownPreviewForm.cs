@@ -9,7 +9,7 @@ using Webview2Viewer;
 
 namespace AnotherMarkdown.Forms
 {
-  public partial class MarkdownPreviewForm : Form, IViewerInterface
+  public partial class MarkdownPreviewForm : Form
   {
     public EventDispatcher OnEvent { get; set; }
 
@@ -55,13 +55,21 @@ namespace AnotherMarkdown.Forms
       statusStrip2.Visible = settings.ShowStatusbar;
     }
 
-    public void RenderMarkdown(string currentText, string filepath)
+    public void RenderMarkdown(string currentText, string filepath, bool force)
     {
       lock (_renderTaskLock) {
         _markdownContent = new MarkdownContent {
           Path = filepath,
           Text = currentText,
         };
+        if (force) {
+          _markdownContentRenderAt = DateTime.MinValue;
+        }
+        else {
+          if (_markdownContentRenderAt == DateTime.MinValue) {
+            _markdownContentRenderAt = DateTime.UtcNow.Add(InputUpdateThreshold);
+          }
+        }
 
         if (_renderTask == null || (_renderTask.IsCompleted || _renderTask.IsFaulted)) {
           _renderTask = RenderMarkdownTask();
@@ -81,7 +89,11 @@ namespace AnotherMarkdown.Forms
               break;
             }
             content = _markdownContent.Value;
+            if (_markdownContentRenderAt > DateTime.UtcNow) {
+              continue;
+            }
             _markdownContent = null;
+            _markdownContentRenderAt = DateTime.MinValue;
           }
           
           await _webView.SetContentAsync(content.Text, content.Path);
@@ -89,6 +101,7 @@ namespace AnotherMarkdown.Forms
       }
       catch (Exception err) {
         Console.WriteLine(err);
+        _markdownContentRenderAt = DateTime.MinValue;
       }
     }
 
@@ -159,10 +172,13 @@ namespace AnotherMarkdown.Forms
       public string Path;
     }
 
+    private DateTime _markdownContentRenderAt = DateTime.MinValue;
     private MarkdownContent? _markdownContent;
 
     private object _renderTaskLock = new object();
     private Task _renderTask;
     private Webview2WebbrowserControl _webView;
+
+    private static readonly TimeSpan InputUpdateThreshold = TimeSpan.FromMilliseconds(400);
   }
 }

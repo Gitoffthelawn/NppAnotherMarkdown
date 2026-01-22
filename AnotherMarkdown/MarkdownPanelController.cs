@@ -30,7 +30,7 @@ namespace AnotherMarkdown
               try {
                 _previewForm = MarkdownPreviewForm.Create(_settings);
                 _previewForm.OnEvent.DocumentChanged += (_, e) => DocumentChanged(e);
-                _previewForm.OnEvent.TrackFirstLine += (_, e) => FirstLineChanged(e);
+                _previewForm.OnEvent.FirstLineChanged += (_, e) => FirstLineChanged(e);
                 _previewForm.OnEvent.PasteImage += (_, e) => PasteImage(e);
                 _previewForm.OnEvent.Navigate += (_, e) => OpenFile(e);
                 _previewForm.DockClosed += (_, e) => TogglePanelVisible();
@@ -44,8 +44,6 @@ namespace AnotherMarkdown
         return _previewForm;
       }
     }
-    private bool SyncViewEnabled => (_settings.SyncViewWithCaretPosition || _settings.SyncViewWithFirstVisibleLine);
-    private bool IsPanelVisible { get; set; }
 
     public MarkdownPanelController()
     {
@@ -110,7 +108,7 @@ namespace AnotherMarkdown
 
       switch (notification.Header.Code) {
         case (uint) SciMsg.SCN_UPDATEUI: {
-          if (IsPanelVisible && _settings.SyncViewWithCaretPosition) {
+          if (_isPanelVisible && _settings.SyncViewWithCaretPosition) {
             var scintillaGateway = scintillaGatewayFactory();
             var currentPos = scintillaGateway.GetCurrentLineNumber();
             if (_lastCaretPosition != currentPos) {
@@ -120,30 +118,28 @@ namespace AnotherMarkdown
               }
             }
           }
-          else if (IsPanelVisible && _settings.SyncViewWithFirstVisibleLine) {
+          else if (_isPanelVisible && _settings.SyncViewWithFirstVisibleLine) {
             _ = SyncWithFirstVisibleLineTask();
           }
           break;
         }
         case (uint) NppMsg.NPPN_BUFFERACTIVATED: {
           if (_skipSyncEventsDue < DateTime.UtcNow) {
-            RenderMarkdownDirect();
+            RenderMarkdownDirect(force: true);
           }
           break;
         }
         case (uint) (NppMsg.NPPN_FIRST + 27): {
-          // NPPN_DARKMODECHANGED (NPPN_FIRST + 27) // To notify plugins that Dark Mode was enabled/disabled
-
           _settings.IsDarkModeEnabled = IsDarkModeEnabled();
-          if (IsPanelVisible) {
+          if (_isPanelVisible) {
             PreviewForm.UpdateSettings(_settings);
-            RenderMarkdownDirect();
+            RenderMarkdownDirect(force: true);
           }
           break;
         }
         case (uint) SciMsg.SCN_MODIFIED: {
           if (_skipSyncEventsDue < DateTime.UtcNow) {
-            RenderMarkdownDeferred();
+            RenderMarkdownDirect(force: false);
           }
           break;
         }
@@ -165,34 +161,11 @@ namespace AnotherMarkdown
       }
     }
 
-    private void RenderMarkdownDeferred()
+    private void RenderMarkdownDirect(bool force)
     {
-      lock (_renderDeferredLock) {
-        if (_renderDeferredTask != null && !_renderDeferredTask.IsCompleted) {
-          var task = _renderDeferredTask;
-          var cts = _renderDeferredCancellationSource;
-          cts.Cancel();
-          task.ContinueWith(t => cts.Dispose());
-        }
-        _renderDeferredCancellationSource = new CancellationTokenSource();
-        _renderDeferredTask = RenderDeferredWorkerAsync(_renderDeferredCancellationSource.Token);
-      }
-    }
-
-    private async Task RenderDeferredWorkerAsync(CancellationToken cancellationToken)
-    {
-      await Task.Delay(InputUpdateThreshold, cancellationToken);
-      try {
-        RenderMarkdownDirect();
-      }
-      catch { }
-    }
-
-    private void RenderMarkdownDirect()
-    {
-      if (IsPanelVisible) {
+      if (_isPanelVisible) {
         _currentFile = _nppGateway.GetCurrentFilePath();
-        PreviewForm.RenderMarkdown(GetCurrentEditorText(), _currentFile);
+        PreviewForm.RenderMarkdown(GetCurrentEditorText(), _currentFile, force);
       }
     }
 
@@ -204,7 +177,7 @@ namespace AnotherMarkdown
 
     private void ScrollToElementAtLineNo(int lineNo)
     {
-      if (IsPanelVisible) {
+      if (_isPanelVisible) {
         var currentFile = _nppGateway.GetCurrentFilePath();
         if (currentFile == _currentFile) {
           PreviewForm.ScrollToElementWithLineNo(lineNo);
@@ -240,14 +213,14 @@ namespace AnotherMarkdown
         _settings.IsDarkModeEnabled = IsDarkModeEnabled();
         SaveSettings();
         //Update Preview
-        if (IsPanelVisible) {
+        if (_isPanelVisible) {
           PreviewForm.UpdateSettings(_settings);
-          RenderMarkdownDirect();
+          RenderMarkdownDirect(force: true);
         }
       }
     }
 
-    private void OpenFile(NavigateTo args)
+    private void OpenFile(NavigateToEvent args)
     {
       if (!File.Exists(args.Filename)) {
         return;
@@ -255,7 +228,7 @@ namespace AnotherMarkdown
       Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) NppMsg.NPPM_DOOPEN, 0, args.Filename);
     }
 
-    private void PasteImage(PasteImage args)
+    private void PasteImage(PasteImageEvent args)
     {
       var path = _nppGateway.GetCurrentFilePath();
       var rootDir = Path.GetDirectoryName(path);
@@ -305,7 +278,7 @@ namespace AnotherMarkdown
       scintillaGateway.InsertText(pos, $"![](./{relativePath})\r\n");
     }
 
-    private void FirstLineChanged(FirstLineChanged args)
+    private void FirstLineChanged(FirstLineChangedEvent args)
     {
       var scintillaGateway = scintillaGatewayFactory();
       var visibleLine = scintillaGateway.GetFirstVisibleLine();
@@ -318,7 +291,7 @@ namespace AnotherMarkdown
       }
     }
 
-    private void DocumentChanged(DocumentContentChanged args)
+    private void DocumentChanged(DocumentChangedEvent args)
     {
       var scintillaGateway = scintillaGatewayFactory();
 
@@ -372,11 +345,10 @@ namespace AnotherMarkdown
       var currentPluginPath = PluginUtils.GetPluginDirectory();
       var helpFile = Path.Combine(currentPluginPath, "README.md");
       Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) NppMsg.NPPM_DOOPEN, 0, helpFile);
-      if (!IsPanelVisible) {
+      if (!_isPanelVisible) {
         TogglePanelVisible();
       }
-
-      RenderMarkdownDirect();
+      RenderMarkdownDirect(force: true);
     }
 
     private void SetIniFilePath()
@@ -396,7 +368,7 @@ namespace AnotherMarkdown
       var wasSyncView = SyncViewEnabled;
       SetSyncViewWithCaretPosition(!_settings.SyncViewWithCaretPosition);
       if (SyncViewEnabled != wasSyncView) {
-        RenderMarkdownDeferred();
+        RenderMarkdownDirect(force: true);
       }
     }
 
@@ -405,7 +377,7 @@ namespace AnotherMarkdown
       var wasSyncView = SyncViewEnabled;
       SetSyncViewWithFirstVisibleLine(!_settings.SyncViewWithFirstVisibleLine);
       if (SyncViewEnabled != wasSyncView) {
-        RenderMarkdownDeferred();
+        RenderMarkdownDirect(force: true);
       }
     }
 
@@ -488,17 +460,17 @@ namespace AnotherMarkdown
 
         Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) NppMsg.NPPM_DMMREGASDCKDLG, 0, _ptrNppTbData.Value);
         Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) NppMsg.NPPM_DMMSHOW, 0, PreviewForm.Handle);
-        IsPanelVisible = true;
+        _isPanelVisible = true;
       }
       else {
-        IsPanelVisible = !IsPanelVisible;
-        var flag = IsPanelVisible ? NppMsg.NPPM_DMMSHOW : NppMsg.NPPM_DMMHIDE;
+        _isPanelVisible = !_isPanelVisible;
+        var flag = _isPanelVisible ? NppMsg.NPPM_DMMSHOW : NppMsg.NPPM_DMMHIDE;
         Win32.SendMessage(PluginBase.nppData._nppHandle, (uint) flag, 0, PreviewForm.Handle);
       }
 
-      if (IsPanelVisible) {
+      if (_isPanelVisible) {
         PreviewForm.UpdateSettings(_settings);
-        RenderMarkdownDirect();
+        RenderMarkdownDirect(force: true);
       }
     }
 
@@ -531,33 +503,27 @@ namespace AnotherMarkdown
 
     protected virtual void Dispose(bool disposing)
     {
-      if (!_disposedValue) {
-        _disposedValue = true;
-        if (disposing) {
-          if (_renderDeferredCancellationSource != null) {
-            _renderDeferredCancellationSource.Cancel();
-            if (_renderDeferredTask != null) {
-              _renderDeferredTask.Wait();
-              _renderDeferredTask = null;
-            }
-            _renderDeferredCancellationSource.Dispose();
-            _renderDeferredCancellationSource = null;
-          }
-
-          _icon?.Dispose();
-          _iconBmp?.Dispose();
-          _icon = null;
-          _iconBmp = null;
-
-          if (_ptrNppTbData.HasValue) {
-            Marshal.DestroyStructure(_ptrNppTbData.Value, typeof(NppTbData));
-            Marshal.FreeHGlobal(_ptrNppTbData.Value);
-            _ptrNppTbData = null;
-          }
-          _previewForm?.Dispose();
-          _previewForm = null;
-        }
+      if (!disposing) {
+        return;
       }
+      if (_disposedValue) {
+        return;
+      }
+
+      _disposedValue = true;
+
+      _icon?.Dispose();
+      _iconBmp?.Dispose();
+      _icon = null;
+      _iconBmp = null;
+
+      if (_ptrNppTbData.HasValue) {
+        Marshal.DestroyStructure(_ptrNppTbData.Value, typeof(NppTbData));
+        Marshal.FreeHGlobal(_ptrNppTbData.Value);
+        _ptrNppTbData = null;
+      }
+      _previewForm?.Dispose();
+      _previewForm = null;
     }
 
     public void Dispose()
@@ -569,9 +535,9 @@ namespace AnotherMarkdown
 
     private const int UNUSED = 0;
 
-    private object _renderDeferredLock = new object();
-    private Task _renderDeferredTask;
-    private CancellationTokenSource _renderDeferredCancellationSource;
+    private bool SyncViewEnabled => (_settings.SyncViewWithCaretPosition || _settings.SyncViewWithFirstVisibleLine);
+    private bool _isPanelVisible;
+
     private MarkdownPreviewForm _previewForm;
     private object _lock = new object();
     private int _myDlgId = -1;
@@ -587,7 +553,5 @@ namespace AnotherMarkdown
     private bool _disposedValue;
     private DateTime _skipSyncEventsDue = DateTime.MinValue;
     private string _currentFile;
-
-    private static readonly TimeSpan InputUpdateThreshold = TimeSpan.FromMilliseconds(400);
   }
 }
