@@ -161,12 +161,6 @@ namespace AnotherMarkdown
       }
     }
 
-    private string GetCurrentEditorText()
-    {
-      var scintillaGateway = scintillaGatewayFactory();
-      return scintillaGateway.GetText(scintillaGateway.GetLength() + 1);
-    }
-
     private void ScrollToElementAtLineNo(int lineNo)
     {
       if (_isPanelVisible) {
@@ -514,9 +508,12 @@ namespace AnotherMarkdown
           if (_renderMarkdownAt > DateTime.UtcNow) {
             continue;
           }
+          _renderMarkdownAt = DateTime.MinValue;
+
+          var scintillaGateway = scintillaGatewayFactory();
+          var currentText = scintillaGateway.GetText(scintillaGateway.GetLength() + 1);
 
           var currentFile = _nppGateway.GetCurrentFilePath();
-          var currentText = GetCurrentEditorText();
           _currentFile = currentFile;
 
           await PreviewForm.RenderMarkdown(currentText, currentFile);
