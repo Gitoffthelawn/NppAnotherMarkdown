@@ -7,7 +7,6 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using AnotherMarkdown.Entities;
@@ -44,6 +43,7 @@ namespace AnotherMarkdown
         return _previewForm;
       }
     }
+    private bool SyncViewEnabled => (_settings.SyncViewWithCaretPosition || _settings.SyncViewWithFirstVisibleLine);
 
     public MarkdownPanelController()
     {
@@ -566,9 +566,7 @@ namespace AnotherMarkdown
 
     private const int UNUSED = 0;
 
-    private bool SyncViewEnabled => (_settings.SyncViewWithCaretPosition || _settings.SyncViewWithFirstVisibleLine);
     private bool _isPanelVisible;
-
     private MarkdownPreviewForm _previewForm;
     private object _lock = new object();
     private int _myDlgId = -1;
@@ -584,7 +582,6 @@ namespace AnotherMarkdown
     private bool _disposedValue;
     private DateTime _skipSyncEventsDue = DateTime.MinValue;
     private string _currentFile;
-
     private DateTime _renderMarkdownAt = DateTime.MinValue;
     private object _renderMarkdownLock = new object();
     private Task _renderMarkdownTask;
