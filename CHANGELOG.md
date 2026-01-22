@@ -1,8 +1,9 @@
 ## Version History
 
-### NppAnotherMarkdown 0.1.7 (released 2026-01-xx)
+### NppAnotherMarkdown 0.1.7 (released 2026-01-20)
 
-* Rewrite all client-side code from plain JavaScript to TypeScript
+* rewrite all client-side code from plain JavaScript to TypeScript
+* panoramic image add ability to display it without scene definition
 * fix: reduce text flickering in the main editor window when synchronizing checklist checkboxes
 
 ### NppAnotherMarkdown 0.1.6 (released 2026-01-15)
