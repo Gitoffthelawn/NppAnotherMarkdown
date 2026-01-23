@@ -29,22 +29,18 @@ export async function scrollToY(targetY: number, behavior: ScrollBehavior = "aut
   const context: IScrollToActive = {
     cancelled: false,
     promise: new Promise<void>(resolve => {
-      console.log(`scrollTo: ${targetY}`);
       let pageYOffset = window.pageYOffset;
-
       const checkInterval = setInterval(() => {
         if (context.cancelled) {
           clearInterval(checkInterval);
           resolve();
           return;
         }
-
         if (window.pageYOffset !== pageYOffset) {
           pageYOffset = window.pageYOffset;
           return;
         }
 
-        console.log("scrollEnd");
         if (scrollToActive === context) {
           scrollToActive = null;
         }
