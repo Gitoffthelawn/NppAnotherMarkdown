@@ -108,18 +108,13 @@ namespace AnotherMarkdown
 
       switch (notification.Header.Code) {
         case (uint) SciMsg.SCN_UPDATEUI: {
-          if (_isPanelVisible && _settings.SyncViewWithCaretPosition) {
-            var scintillaGateway = scintillaGatewayFactory();
-            var currentPos = scintillaGateway.GetCurrentLineNumber();
-            if (_lastCaretPosition != currentPos) {
-              _lastCaretPosition = currentPos;
-              if (_skipSyncEventsDue < DateTime.UtcNow) {
-                ScrollToElementAtLineNo(_lastCaretPosition);
+          if (_isPanelVisible && (_settings.SyncViewWithCaretPosition || _settings.SyncViewWithFirstVisibleLine)) {
+            lock (_syncViewLock) {
+              _syncViewPending = true;
+              if (_syncViewTask == null || (_syncViewTask.IsCompleted || _syncViewTask.IsFaulted)) {
+                _syncViewTask = SyncViewTask();
               }
             }
-          }
-          else if (_isPanelVisible && _settings.SyncViewWithFirstVisibleLine) {
-            _ = SyncWithFirstVisibleLineTask();
           }
           break;
         }
@@ -146,27 +141,47 @@ namespace AnotherMarkdown
       }
     }
 
-    private async Task SyncWithFirstVisibleLineTask()
+    private async Task SyncViewTask()
     {
-      await Task.Delay(50);
-      var scintillaGateway = scintillaGatewayFactory();
-      var currentPos = scintillaGateway.GetFirstVisibleLine();
-
-      if (_currentFirstVisibleLine != currentPos) {
-        _currentFirstVisibleLine = currentPos;
-        if (_skipSyncEventsDue < DateTime.UtcNow) {
-          var docLine = scintillaGateway.DocLineFromVisible(currentPos);
-          ScrollToElementAtLineNo(docLine);
+      while(_isPanelVisible) {
+        await Task.Delay(50);
+        if (_disposedValue || !_isPanelVisible) {
+          return;
         }
-      }
-    }
+        if ((_settings.SyncViewWithFirstVisibleLine || _settings.SyncViewWithCaretPosition) == false) {
+          return;
+        }
 
-    private void ScrollToElementAtLineNo(int lineNo)
-    {
-      if (_isPanelVisible) {
+        lock (_syncViewLock) {
+          if (!_syncViewPending) {
+            return;
+          }
+          _syncViewPending = false;
+        }
+
         var currentFile = _nppGateway.GetCurrentFilePath();
-        if (currentFile == _currentFile) {
-          PreviewForm.ScrollToElementWithLineNo(lineNo);
+        if (currentFile != _currentFile) {
+          _lastScrollToLine = -1;
+        }
+
+        int nLine = -1;
+        var scintillaGateway = scintillaGatewayFactory();
+
+        if (_settings.SyncViewWithFirstVisibleLine) {
+          nLine = scintillaGateway.GetFirstVisibleLine();
+          nLine = scintillaGateway.DocLineFromVisible(nLine);
+        }
+        else if (_settings.SyncViewWithCaretPosition) {
+          nLine = scintillaGateway.GetCurrentLineNumber();
+        }
+
+        if (nLine == -1 || nLine == _lastScrollToLine) {
+          return;
+        }
+
+        _lastScrollToLine = nLine;
+        if (_skipSyncEventsDue < DateTime.UtcNow) {
+          await PreviewForm.ScrollToElementWithLineNo(nLine);
         }
       }
     }
@@ -574,14 +589,19 @@ namespace AnotherMarkdown
     private readonly INotepadPPGateway _nppGateway;
     private string _iniFilePath;
     private int _lastCaretPosition;
-    private int _currentFirstVisibleLine;
+    private int _lastScrollToLine;
     private Settings _settings;
     private IntPtr? _ptrNppTbData;
     private Icon _icon;
     private Bitmap _iconBmp;
     private bool _disposedValue;
+
     private DateTime _skipSyncEventsDue = DateTime.MinValue;
     private string _currentFile;
+    private object _syncViewLock = new object();
+    private bool _syncViewPending = false;
+    private Task _syncViewTask;
+
     private DateTime _renderMarkdownAt = DateTime.MinValue;
     private object _renderMarkdownLock = new object();
     private Task _renderMarkdownTask;

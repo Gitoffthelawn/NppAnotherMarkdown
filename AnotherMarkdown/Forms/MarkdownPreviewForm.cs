@@ -62,10 +62,10 @@ namespace AnotherMarkdown.Forms
       }
     }
 
-    public void ScrollToElementWithLineNo(int lineNo)
+    public async Task ScrollToElementWithLineNo(int lineNo)
     {
       if (_webView != null) {
-        _webView.ScrollToElementWithLineNo(lineNo);
+        await _webView.ScrollToElementWithLineNo(lineNo);
       }
     }
 

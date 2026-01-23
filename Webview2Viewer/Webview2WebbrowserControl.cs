@@ -96,12 +96,12 @@ namespace Webview2Viewer
       });
     }
 
-    public void ScrollToElementWithLineNo(int lineNo)
+    public async Task ScrollToElementWithLineNo(int lineNo)
     {
       if (lineNo <= 0) {
         lineNo = 0;
       }
-      ExecuteWebviewAction((webView) => webView.ExecuteScriptAsync($"window.scrollToLine({lineNo})"));
+      await ExecuteWebviewActionAsync((webView) => webView.ExecuteScriptAsync($"window.scrollToLine({lineNo})"));
     }
 
     public async Task SetContentAsync(string content, string documentPath)
